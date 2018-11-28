@@ -19,213 +19,209 @@ typedef volatile unsigned int ioreg;
 #define ADC_CDR4 (ioreg *) 0xfffd8040 // ADC channel 4 data register
 #define ADC_CDR5 (ioreg *) 0xfffd8044 // ADC channel 5 data register
 
-#define portA              0xc000 // 0x
-#define portB              0x4000
+#define portA 0xc000 // Write data to Port A and update Port B with BUFFER content
+#define portB 0x4000 // Write data to Port B and BUFFER
+#define minPaddleValue 105 // Maximum value that can be retrieve from the ADC_CDR4 register
+#define maxPaddleValue 555 // Minimum value that can be retrieve from the ADC_CDR4 register
 
-// pong constants
+// Constants used to control Pong
 #define zoneWidth 1000
 #define zoneHeight 500
-
-#define paddleWidth 20
-#define paddleLength 70
-
-#define paddleSpacing 40
-// #define paddleMoveStep 7
-
+#define batWidth 20
+#define batLength 70
+#define batSpacing 40
 #define scoresOffset 30
 #define digitSegmentLength 25
-
+#define scoreBias 10
 #define ballSpeed 6
 #define ballRadius 5
 
-// global variables
-int leftPaddleOffset = 0, rightPaddleOffset = 0;
-int leftPaddleControl = 0, rightPaddleControl = 0;
+// Global variables
+int leftBatOffset = 0, rightBatOffset = 0;
 int ballX = 0, ballY = 0;
 int ballControlX = 1, ballControlY = 1;
 int leftScore = 0, rightScore = 0;
 
 int main()
 {
-  *PMC_PCER = 0x34; // enable PIOA, ADC and SPI
-
+  // Outputs
+  *PMC_PCER = 0x34;  // enable PIOA, ADC and SPI
   LowLevelInit();    // Set up PLL and MCK clocks
   *PIO_PDR = 0x7800; // disable bits 11 - 14 for SPI (See manual section 10.4)
   *PIO_ASR = 0x7800; // enable peripheral A for bits 11 - 14
   *SPI_CR = 0x80;    // reset the SPI
   *SPI_CR = 0x1;     // enable the SPI
-
   *SPI_MR = 0x11;    // set SPI to master, disable fault detection
   *SPI_CSR0 = 0x183; // set clock polarity = 1, clock phase = 1, Bits per transfer = 16, serial clock baud rate = 1
-
   *SPI_TDR = 0xd002; // Set reference voltage to 2.048V in control register
 
   // Inputs
-  *ADC_CR = 0x1;    // reset the ADC
-  *ADC_CHER = 0x30; // enable analog channels 4 and 5
-
+  *ADC_CR = 0x1;        // reset the ADC
+  *ADC_CHER = 0x30;     // enable analog channels 4 and 5
   *ADC_MR = 0x030b0400; // sample+holdtime = 3, startup = b, prescale = 4
 
-  int i;
+  // Mainloop
   while(1)
   {
-    // Handle Input
-    handleInput();
-
-    drawZone();
-    drawScores();
-
-    drawBall();
-    moveBall();
-
-    zoneCollision();
-
-    drawPaddles();
-
-    paddleCollision();
+    input();
+    update();
+    render();
   }
 
   return 0;
 }
 
-handleInput()
+input()
 {
   *ADC_CR = 0x2;                        // start conversion
   while (*ADC_SR & 0x10 == 0);          // wait for ch4 to complete conversion
-  int val1 = *ADC_CDR4;         // store value in ADC_CDR4
-  leftPaddleOffset = val1 - 400;   // Limited range of paddle (0 - 350ish) -- CHANGE LENGTH OF PADDLE
-  // >>> val1/val2 goes from 105 to 555 (450 range)
-
+  int leftPaddleValue = *ADC_CDR4;      // retrieve value from ADC_CDR4 register
+  leftBatOffset = (minPaddleValue - leftPaddleValue)/(maxPaddleValue - minPaddleValue)*(zoneHeight - batLength) -zoneHeight/2;
 
   *ADC_CR = 0x2;                        // start conversion
   while (*ADC_SR & 0x20 == 0);          // wait for ch5 to complete conversion
-  int val2 = *ADC_CDR5;         // store value in ADC_CDR4
-  rightPaddleOffset = val2 - 400;   // Limited range of paddle (0 - 350ish)
+  int rightPaddleValue = *ADC_CDR5;     // retrieve value from ADC_CDR4 register
+  rightBatOffset = (minPaddleValue - rightPaddleValue)/(maxPaddleValue - minPaddleValue)*(zoneHeight - batLength) -zoneHeight/2;
+}
+
+update()
+{
+  moveBall();
+  zoneCollision();
+  batCollision();
+}
+
+render()
+{
+  drawZone();
+  drawBall();
+  drawBats();
+  drawScores();
 }
 
 drawPoint(int x, int y)
 {
-  x += 500; // Hacky code - pls patch
-  y = 400 - y; // Ditto
+  // transform
+  x = 500 + x;
+  y = 400 - y;
 
-  while(*SPI_SR & 1 != 1); // Wait for serialisation
+  // check that x and y have values that can be represented by a 10 bit unsigned integer
+  if(x >= 0 && x < 2048 && y >= 0 && y < 2048)
+  {
+    // for both x and y, perform a left bit shift operation twice (multiply by 4) to
+    // move the value of the coordinate to the appropriate bits (D02-D11) which also
+    // implicitly sets the values of D00 and D01 to 0. after this add the appropriate
+    // constant that has the relevent control bits set (D12-D15). then transmit the
+    // two least significant bytes of this resulting value to the SPI_TDR register
 
-  *SPI_TDR = (x << 2) + portB;
+    while(*SPI_SR & 1 != 1);     // Wait for serialisation
+    *SPI_TDR = (x << 2) + portB; // Transmit to the SPI_TDR register
 
-  while(*SPI_SR & 1 != 1); // Wait for serialisation
-
-  *SPI_TDR = (y << 2) + portA;
-}
-
- delay(float count)
-{
-	register int i;
-	for (i = count*0x08000000; i > 0; i--);
+    while(*SPI_SR & 1 != 1);     // Wait for serialisation
+    *SPI_TDR = (y << 2) + portA; // Transmit to the SPI_TDR register
+  }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-reset() {
+reset()
+{
   ballX = 0;
   ballY = 0;
 }
 
 drawScores()
 {
-  int bias = 10;
+  // Draws colon
+  drawCircle(0, -zoneHeight/2 + scoresOffset + scoreBias, 4);
+  drawCircle(0, -zoneHeight/2 + scoresOffset + digitSegmentLength*2 - scoreBias, 4);
 
-  drawCircle(0, -zoneHeight/2 + scoresOffset + bias, 2);
-  drawCircle(0, -zoneHeight/2 + scoresOffset + 2*digitSegmentLength - bias, 2);
+  // Draws left players score
+  drawDigit(-digitSegmentLength - scoreBias*2 -digitSegmentLength, -zoneHeight/2 + scoresOffset, leftScore/10);
+  drawDigit(-digitSegmentLength - scoreBias, -zoneHeight/2 + scoresOffset, leftScore%10);
 
-  drawDigit(-digitSegmentLength - 2*bias -digitSegmentLength, -zoneHeight/2 + scoresOffset, leftScore/10);
-  drawDigit(-digitSegmentLength - bias, -zoneHeight/2 + scoresOffset, leftScore % 10);
-
-  drawDigit(bias, -zoneHeight/2 + scoresOffset, rightScore/10);
-  drawDigit(2*bias + digitSegmentLength, -zoneHeight/2 + scoresOffset, rightScore % 10);
+  // Draws right players score
+  drawDigit(scoreBias, -zoneHeight/2 + scoresOffset, rightScore/10);
+  drawDigit(scoreBias*2 + digitSegmentLength, -zoneHeight/2 + scoresOffset, rightScore%10);
 }
 
- drawDigit(int x, int y, int n)
+// draws a digit using a 7-segment display. (x, y) is the top left of the digit and n is the value of the digit
+drawDigit(int x, int y, int n)
 {
-  if(n == 0 || n == 2 || n == 3 || n == 5 || n == 6 || n == 7 || n == 8 || n == 9) drawHorizontalLine(x, y, digitSegmentLength);
-  if(n == 0 || n == 1 || n == 2 || n == 3 || n == 4 || n == 7 || n == 8 || n == 9) drawVerticalLine(x + digitSegmentLength, y, digitSegmentLength);
+  n %= 9;
+  if(n == 0 || n == 2 || n == 3 || n == 5 || n == 6 || n == 7 || n == 8 || n == 9)           drawHorizontalLine(x, y, digitSegmentLength);
+  if(n == 0 || n == 1 || n == 2 || n == 3 || n == 4 || n == 7 || n == 8 || n == 9)           drawVerticalLine(x + digitSegmentLength, y, digitSegmentLength);
   if(n == 0 || n == 1 || n == 3 || n == 4 || n == 5 || n == 6 || n == 7 || n == 8 || n == 9) drawVerticalLine(x + digitSegmentLength, y + digitSegmentLength, digitSegmentLength);
-  if(n == 0 || n == 2 || n == 3 || n == 5 || n == 6 || n == 8) drawHorizontalLine(x, y + 2*digitSegmentLength, digitSegmentLength);
-  if(n == 0 || n == 2 || n == 6 || n == 8) drawVerticalLine(x, y + digitSegmentLength, digitSegmentLength);
-  if(n == 0 || n == 4 || n == 5 || n == 6 || n == 8 || n == 9) drawVerticalLine(x, y, digitSegmentLength);
-  if(n == 2 || n == 3 || n == 4 || n == 5 || n == 6 || n == 8 || n == 9) drawHorizontalLine(x, y + digitSegmentLength, digitSegmentLength);
+  if(n == 0 || n == 2 || n == 3 || n == 5 || n == 6 || n == 8)                               drawHorizontalLine(x, y + digitSegmentLength*2, digitSegmentLength);
+  if(n == 0 || n == 2 || n == 6 || n == 8)                                                   drawVerticalLine(x, y + digitSegmentLength, digitSegmentLength);
+  if(n == 0 || n == 4 || n == 5 || n == 6 || n == 8 || n == 9)                               drawVerticalLine(x, y, digitSegmentLength);
+  if(n == 2 || n == 3 || n == 4 || n == 5 || n == 6 || n == 8 || n == 9)                     drawHorizontalLine(x, y + digitSegmentLength, digitSegmentLength);
 }
 
- paddleCollision()
+batCollision()
 {
-  if (ballX - ballRadius < -zoneWidth/2 + paddleWidth + paddleSpacing && ballY > leftPaddleOffset && ballY < leftPaddleOffset + paddleLength)
+  if(ballControlX < 0 && ballX - ballRadius < -zoneWidth/2 + batWidth + batSpacing && ballY > leftBatOffset && ballY < leftBatOffset + batLength)
   {
-    if (ballControlX < 0)
-    {
-      ballControlX = -ballControlX;
-    }
+    ballControlX = -ballControlX;
   }
 
-  if (ballX + ballRadius > zoneWidth/2 - paddleWidth - paddleSpacing && ballY > rightPaddleOffset && ballY < rightPaddleOffset + paddleLength)
+  if(ballControlX > 0 && ballX + ballRadius > zoneWidth/2 - batWidth - batSpacing && ballY > rightBatOffset && ballY < rightBatOffset + batLength)
   {
-    if (ballControlX > 0)
-    {
-      ballControlX = -ballControlX;
-    }
+    ballControlX = -ballControlX;
   }
 }
 
- zoneCollision()
+zoneCollision()
 {
-  if ( ballX + ballRadius > zoneWidth/2)
+  if(ballX + ballRadius > zoneWidth/2)
   {
-   ballControlX = -ballControlX;
-   leftScore++;
-   reset();
- }
- else if ( ballX - ballRadius < -zoneWidth/2)
- {
-   ballControlX = -ballControlX;
-   rightScore++;
-   reset();
- }
- if ( ballY + ballRadius > zoneHeight/2 || ballY - ballRadius < -zoneHeight/2 )
- {
-   ballControlY = -ballControlY;
- }
+    ballControlX = -ballControlX;
+    leftScore++;
+    reset();
+  }
+  else if(ballX - ballRadius < -zoneWidth/2)
+  {
+    ballControlX = -ballControlX;
+    rightScore++;
+    reset();
+  }
+  if(ballY + ballRadius > zoneHeight/2 || ballY - ballRadius < -zoneHeight/2 )
+  {
+    ballControlY = -ballControlY;
+  }
 }
 
- drawZone()
+drawZone()
 {
   drawRect(-zoneWidth/2, -zoneHeight/2, zoneWidth, zoneHeight);
 }
 
- drawBall()
+drawBall()
 {
   drawCircle(ballX, ballY, ballRadius);
 }
 
- moveBall()
+moveBall()
 {
   ballX += ballControlX * ballSpeed;
   ballY += ballControlY * ballSpeed;
 }
 
- drawPaddles()
+drawBats()
 {
-  drawRect(-zoneWidth/2 + paddleSpacing, leftPaddleOffset, paddleWidth, paddleLength);
-  drawRect(zoneWidth/2 - paddleSpacing - paddleWidth, rightPaddleOffset, paddleWidth, paddleLength);
+  drawRect(-zoneWidth/2 + batSpacing, leftBatOffset, batWidth, batLength);
+  drawRect(zoneWidth/2 - batSpacing - batWidth, rightBatOffset, batWidth, batLength);
 }
 
-// x, y is centre of the circle
- drawCircle(int x, int y, int radius)
+// draws a circle of radius r centred at (x, y)
+drawCircle(int x, int y, int r)
 {
-  int i;
-  int j;
-  for(i = -radius; i < radius; i++)
+  int i, j;
+  for(i = -r; i < r; i++)
   {
-    for(j = -radius; j < radius; j++)
+    for(j = -r; j < r; j++)
     {
-      if(i * i + j * j < radius * radius)
+      if(i * i + j * j < r * r)
       {
           drawPoint(x + i, y + j);
       }
@@ -233,8 +229,8 @@ drawScores()
   }
 }
 
-// x, y is top left corner of the rectangle
- drawRect(int x, int y, int length, int height)
+// (x, y) is top left corner of the rectangle
+drawRect(int x, int y, int length, int height)
 {
   drawVerticalLine(x, y, height);
   drawVerticalLine(x + length, y, height);
@@ -242,21 +238,21 @@ drawScores()
   drawHorizontalLine(x, y + height, length);
 }
 
-// draws the line south from x, y
- drawVerticalLine(int x, int y, int length)
+// draws a line of length l vertically downwards from (x, y)
+drawVerticalLine(int x, int y, int l)
 {
   int i;
-  for(i = 0; i < length; i++)
+  for(i = 0; i < l; i++)
   {
     drawPoint(x, y + i);
   }
 }
 
-// draws the line east from x, y
- drawHorizontalLine(int x, int y, int length)
+// draws a line of length l horizontally to the right from (x, y)
+drawHorizontalLine(int x, int y, int l)
 {
   int i;
-  for(i = 0; i < length; i++)
+  for(i = 0; i < l; i++)
   {
     drawPoint(x + i, y);
   }
