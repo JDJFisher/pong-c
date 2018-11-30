@@ -60,6 +60,9 @@ int main()
   *ADC_CHER = 0x30;     // enable analog channels 4 and 5
   *ADC_MR = 0x030b0400; // sample+holdtime = 3, startup = b, prescale = 4
 
+  // Centre the ball
+  reset();
+
   // Mainloop
   while(1)
   {
@@ -76,12 +79,20 @@ input()
   *ADC_CR = 0x2;                        // start conversion
   while (*ADC_SR & 0x10 == 0);          // wait for ch4 to complete conversion
   int leftPaddleValue = *ADC_CDR4;      // retrieve value from ADC_CDR4 register
-  leftBatOffset = (minPaddleValue - leftPaddleValue)/(maxPaddleValue - minPaddleValue)*(zoneHeight - batLength) -zoneHeight/2;
+
+  // linearly interpolate the value from the left paddle to the appropriate range based on the zone height
+  leftBatOffset = (leftPaddleValue - minPaddleValue)
+                 /(maxPaddleValue - minPaddleValue)
+                 *(zoneHeight - batLength);
 
   *ADC_CR = 0x2;                        // start conversion
   while (*ADC_SR & 0x20 == 0);          // wait for ch5 to complete conversion
   int rightPaddleValue = *ADC_CDR5;     // retrieve value from ADC_CDR4 register
-  rightBatOffset = (minPaddleValue - rightPaddleValue)/(maxPaddleValue - minPaddleValue)*(zoneHeight - batLength) -zoneHeight/2;
+
+  // linearly interpolate the value from the right paddle to the appropriate range based on the zone height
+  rightBatOffset = (rightPaddleValue - minPaddleValue)
+                  /(maxPaddleValue - minPaddleValue)
+                  *(zoneHeight - batLength);
 }
 
 update()
@@ -101,17 +112,13 @@ render()
 
 drawPoint(int x, int y)
 {
-  // transform
-  x = 500 + x;
-  y = 400 - y;
-
   // check that x and y have values that can be represented by a 10 bit unsigned integer
   if(x >= 0 && x < 2048 && y >= 0 && y < 2048)
   {
     // for both x and y, perform a left bit shift operation twice (multiply by 4) to
     // move the value of the coordinate to the appropriate bits (D02-D11) which also
     // implicitly sets the values of D00 and D01 to 0. after this add the appropriate
-    // constant that has the relevent control bits set (D12-D15). then transmit the
+    // constant that has the relevant control bits set (D12-D15). then transmit the
     // two least significant bytes of this resulting value to the SPI_TDR register
 
     while(*SPI_SR & 1 != 1);     // Wait for serialisation
@@ -122,95 +129,33 @@ drawPoint(int x, int y)
   }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-reset()
+// draws a line of length l vertically upwards from (x, y)
+drawVerticalLine(int x, int y, int l)
 {
-  ballX = 0;
-  ballY = 0;
-}
-
-drawScores()
-{
-  // Draws colon
-  drawCircle(0, -zoneHeight/2 + scoresOffset + scoreBias, 4);
-  drawCircle(0, -zoneHeight/2 + scoresOffset + digitSegmentLength*2 - scoreBias, 4);
-
-  // Draws left players score
-  drawDigit(-digitSegmentLength - scoreBias*2 -digitSegmentLength, -zoneHeight/2 + scoresOffset, leftScore/10);
-  drawDigit(-digitSegmentLength - scoreBias, -zoneHeight/2 + scoresOffset, leftScore%10);
-
-  // Draws right players score
-  drawDigit(scoreBias, -zoneHeight/2 + scoresOffset, rightScore/10);
-  drawDigit(scoreBias*2 + digitSegmentLength, -zoneHeight/2 + scoresOffset, rightScore%10);
-}
-
-// draws a digit using a 7-segment display. (x, y) is the top left of the digit and n is the value of the digit
-drawDigit(int x, int y, int n)
-{
-  n %= 9;
-  if(n == 0 || n == 2 || n == 3 || n == 5 || n == 6 || n == 7 || n == 8 || n == 9)           drawHorizontalLine(x, y, digitSegmentLength);
-  if(n == 0 || n == 1 || n == 2 || n == 3 || n == 4 || n == 7 || n == 8 || n == 9)           drawVerticalLine(x + digitSegmentLength, y, digitSegmentLength);
-  if(n == 0 || n == 1 || n == 3 || n == 4 || n == 5 || n == 6 || n == 7 || n == 8 || n == 9) drawVerticalLine(x + digitSegmentLength, y + digitSegmentLength, digitSegmentLength);
-  if(n == 0 || n == 2 || n == 3 || n == 5 || n == 6 || n == 8)                               drawHorizontalLine(x, y + digitSegmentLength*2, digitSegmentLength);
-  if(n == 0 || n == 2 || n == 6 || n == 8)                                                   drawVerticalLine(x, y + digitSegmentLength, digitSegmentLength);
-  if(n == 0 || n == 4 || n == 5 || n == 6 || n == 8 || n == 9)                               drawVerticalLine(x, y, digitSegmentLength);
-  if(n == 2 || n == 3 || n == 4 || n == 5 || n == 6 || n == 8 || n == 9)                     drawHorizontalLine(x, y + digitSegmentLength, digitSegmentLength);
-}
-
-batCollision()
-{
-  if(ballControlX < 0 && ballX - ballRadius < -zoneWidth/2 + batWidth + batSpacing && ballY > leftBatOffset && ballY < leftBatOffset + batLength)
+  int i;
+  for(i = 0; i < l; i++)
   {
-    ballControlX = -ballControlX;
-  }
-
-  if(ballControlX > 0 && ballX + ballRadius > zoneWidth/2 - batWidth - batSpacing && ballY > rightBatOffset && ballY < rightBatOffset + batLength)
-  {
-    ballControlX = -ballControlX;
+    drawPoint(x, y + i);
   }
 }
 
-zoneCollision()
+// draws a line of length l horizontally to the right from (x, y)
+drawHorizontalLine(int x, int y, int l)
 {
-  if(ballX + ballRadius > zoneWidth/2)
+  int i;
+  for(i = 0; i < l; i++)
   {
-    ballControlX = -ballControlX;
-    leftScore++;
-    reset();
-  }
-  else if(ballX - ballRadius < -zoneWidth/2)
-  {
-    ballControlX = -ballControlX;
-    rightScore++;
-    reset();
-  }
-  if(ballY + ballRadius > zoneHeight/2 || ballY - ballRadius < -zoneHeight/2 )
-  {
-    ballControlY = -ballControlY;
+    drawPoint(x + i, y);
   }
 }
 
-drawZone()
+// (x, y) is bottom left corner of the rectangle
+drawRect(int x, int y, int length, int height)
 {
-  drawRect(-zoneWidth/2, -zoneHeight/2, zoneWidth, zoneHeight);
-}
-
-drawBall()
-{
-  drawCircle(ballX, ballY, ballRadius);
-}
-
-moveBall()
-{
-  ballX += ballControlX * ballSpeed;
-  ballY += ballControlY * ballSpeed;
-}
-
-drawBats()
-{
-  drawRect(-zoneWidth/2 + batSpacing, leftBatOffset, batWidth, batLength);
-  drawRect(zoneWidth/2 - batSpacing - batWidth, rightBatOffset, batWidth, batLength);
+  drawVerticalLine(x, y, height);
+  drawVerticalLine(x + length, y, height);
+  drawHorizontalLine(x, y, length);
+  drawHorizontalLine(x, y + height, length);
 }
 
 // draws a circle of radius r centred at (x, y)
@@ -229,31 +174,91 @@ drawCircle(int x, int y, int r)
   }
 }
 
-// (x, y) is top left corner of the rectangle
-drawRect(int x, int y, int length, int height)
+reset()
 {
-  drawVerticalLine(x, y, height);
-  drawVerticalLine(x + length, y, height);
-  drawHorizontalLine(x, y, length);
-  drawHorizontalLine(x, y + height, length);
+  ballX = zoneWidth/2;
+  ballY = zoneHeight/2;
 }
 
-// draws a line of length l vertically downwards from (x, y)
-drawVerticalLine(int x, int y, int l)
+drawScores()
 {
-  int i;
-  for(i = 0; i < l; i++)
+  // Draws colon
+  drawCircle(zoneWidth/2, zoneHeight - scoresOffset - scoreBias, 2);
+  drawCircle(zoneWidth/2, zoneHeight - scoresOffset - digitSegmentLength*2 + scoreBias, 2);
+
+  // Draws left players score
+  drawDigit(zoneWidth/2 - digitSegmentLength*2 - scoreBias*2, zoneHeight - digitSegmentLength*2 - scoresOffset, leftScore/10);
+  drawDigit(zoneWidth/2 - digitSegmentLength - scoreBias, zoneHeight - digitSegmentLength*2 - scoresOffset, leftScore%10);
+
+  // Draws right players score
+  drawDigit(zoneWidth/2 + scoreBias, zoneHeight - digitSegmentLength*2 - scoresOffset, rightScore/10);
+  drawDigit(zoneWidth/2 + scoreBias*2 + digitSegmentLength, zoneHeight - digitSegmentLength*2 - scoresOffset, rightScore%10);
+}
+
+// draws a digit using a 7-segment display. (x, y) is the bottom left of the digit and n is the value of the digit
+void drawDigit(int x, int y, int n)
+{
+  n %= 10;
+  if(n == 0 || n == 2 || n == 3 || n == 5 || n == 6 || n == 7 || n == 8 || n == 9)           drawHorizontalLine(x, y + digitSegmentLength*2, digitSegmentLength);
+  if(n == 0 || n == 1 || n == 2 || n == 3 || n == 4 || n == 7 || n == 8 || n == 9)           drawVerticalLine(x + digitSegmentLength, y + digitSegmentLength, digitSegmentLength);
+  if(n == 0 || n == 1 || n == 3 || n == 4 || n == 5 || n == 6 || n == 7 || n == 8 || n == 9) drawVerticalLine(x + digitSegmentLength, y, digitSegmentLength);
+  if(n == 0 || n == 2 || n == 3 || n == 5 || n == 6 || n == 8)                               drawHorizontalLine(x, y, digitSegmentLength);
+  if(n == 0 || n == 2 || n == 6 || n == 8)                                                   drawVerticalLine(x, y, digitSegmentLength);
+  if(n == 0 || n == 4 || n == 5 || n == 6 || n == 8 || n == 9)                               drawVerticalLine(x, y + digitSegmentLength, digitSegmentLength);
+  if(n == 2 || n == 3 || n == 4 || n == 5 || n == 6 || n == 8 || n == 9)                     drawHorizontalLine(x, y + digitSegmentLength, digitSegmentLength);
+}
+
+batCollision()
+{
+  if(ballControlX < 0 && ballX - ballRadius < batWidth + batSpacing && ballY > leftBatOffset && ballY < leftBatOffset + batLength)
   {
-    drawPoint(x, y + i);
+    ballControlX = -ballControlX;
+  }
+
+  if(ballControlX > 0 && ballX + ballRadius > zoneWidth - batWidth - batSpacing && ballY > rightBatOffset && ballY < rightBatOffset + batLength)
+  {
+    ballControlX = -ballControlX;
   }
 }
 
-// draws a line of length l horizontally to the right from (x, y)
-drawHorizontalLine(int x, int y, int l)
+zoneCollision()
 {
-  int i;
-  for(i = 0; i < l; i++)
+  if(ballX + ballRadius > zoneWidth)
   {
-    drawPoint(x + i, y);
+    ballControlX = -ballControlX;
+    leftScore++;
+    reset();
   }
+  else if(ballX - ballRadius < 0)
+  {
+    ballControlX = -ballControlX;
+    rightScore++;
+    reset();
+  }
+  if(ballY + ballRadius > zoneHeight || ballY - ballRadius < 0)
+  {
+    ballControlY = -ballControlY;
+  }
+}
+
+drawZone()
+{
+  drawRect(0, 0, zoneWidth, zoneHeight);
+}
+
+drawBall()
+{
+  drawCircle(ballX, ballY, ballRadius);
+}
+
+moveBall()
+{
+  ballX += ballControlX * ballSpeed;
+  ballY += ballControlY * ballSpeed;
+}
+
+drawBats()
+{
+  drawRect(batSpacing, leftBatOffset, batWidth, batLength);
+  drawRect(zoneWidth - batSpacing - batWidth, rightBatOffset, batWidth, batLength);
 }
