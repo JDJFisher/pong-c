@@ -31,8 +31,8 @@ typedef volatile unsigned int ioreg;
 #define batLength 100
 #define batSpacing 20
 #define scoresOffset 30
-#define digitSegmentLength 30
-#define scoreBias 20
+#define symbolSegmentLength 30
+#define symbolSpacing 20
 #define initialSpeed 5
 #define speedIncrement 1
 #define ballRadius 5
@@ -82,7 +82,6 @@ input()
   *ADC_CR = 0x2;                        // start conversion
   while (*ADC_SR & 0x10 == 0);          // wait for ch4 to complete conversion
   int leftPaddleValue = *ADC_CDR4;      // retrieve value from ADC_CDR4 register
-  // leftBatOffset = leftPaddleValue;
 
   // linearly interpolate the value from the left paddle to the appropriate range based on the zone height
   leftBatOffset = (leftPaddleValue - minPaddleValue)
@@ -92,7 +91,6 @@ input()
   *ADC_CR = 0x2;                        // start conversion
   while (*ADC_SR & 0x20 == 0);          // wait for ch5 to complete conversion
   int rightPaddleValue = *ADC_CDR5;     // retrieve value from ADC_CDR4 register
-  // rightBatOffset = rightPaddleValue;
 
   // linearly interpolate the value from the right paddle to the appropriate range based on the zone height
   rightBatOffset = (rightPaddleValue - minPaddleValue)
@@ -109,9 +107,13 @@ update()
 
 render()
 {
-  if (leftScore >= winningScore || rightScore >= winningScore)
+  if (leftScore >= winningScore)
   {
-    drawWinner();
+    drawWinner(1);
+  }
+  else if (rightScore >= winningScore)
+  {
+    drawWinner(2);
   }
   else
   {
@@ -196,62 +198,61 @@ reset()
 drawScores()
 {
   // Draws colon
-  drawCircle(zoneWidth/2, zoneHeight - scoresOffset - scoreBias, 2);
-  drawCircle(zoneWidth/2, zoneHeight - scoresOffset - digitSegmentLength*2 + scoreBias, 2);
+  drawCircle(zoneWidth/2, zoneHeight - scoresOffset - symbolSpacing, 2);
+  drawCircle(zoneWidth/2, zoneHeight - scoresOffset - symbolSegmentLength*2 + symbolSpacing, 2);
 
   // Draws left players score
-  drawDigit(zoneWidth/2 - digitSegmentLength*2 - scoreBias*2, zoneHeight - digitSegmentLength*2 - scoresOffset, leftScore/10);
-  drawDigit(zoneWidth/2 - digitSegmentLength - scoreBias, zoneHeight - digitSegmentLength*2 - scoresOffset, leftScore%10);
+  drawDigit(zoneWidth/2 - symbolSegmentLength*2 - symbolSpacing*2, zoneHeight - symbolSegmentLength*2 - scoresOffset, leftScore/10);
+  drawDigit(zoneWidth/2 - symbolSegmentLength - symbolSpacing, zoneHeight - symbolSegmentLength*2 - scoresOffset, leftScore%10);
 
   // Draws right players score
-  drawDigit(zoneWidth/2 + scoreBias, zoneHeight - digitSegmentLength*2 - scoresOffset, rightScore/10);
-  drawDigit(zoneWidth/2 + scoreBias*2 + digitSegmentLength, zoneHeight - digitSegmentLength*2 - scoresOffset, rightScore%10);
+  drawDigit(zoneWidth/2 + symbolSpacing, zoneHeight - symbolSegmentLength*2 - scoresOffset, rightScore/10);
+  drawDigit(zoneWidth/2 + symbolSpacing*2 + symbolSegmentLength, zoneHeight - symbolSegmentLength*2 - scoresOffset, rightScore%10);
 }
 
 // draws a digit using a 7-segment display. (x, y) is the bottom left of the digit and n is the value of the digit
 void drawDigit(int x, int y, int n)
 {
   n %= 10;
-  if(n != 1 && n != 4)                      drawHorizontalLine(x, y + digitSegmentLength*2, digitSegmentLength);
-  if(n != 5 && n != 6)                      drawVerticalLine(x + digitSegmentLength, y + digitSegmentLength, digitSegmentLength);
-  if(n != 2)                                drawVerticalLine(x + digitSegmentLength, y, digitSegmentLength);
-  if(n != 1 && n != 4 && n != 7 && n != 9)  drawHorizontalLine(x, y, digitSegmentLength);
-  if(n == 0 || n == 2 || n == 6 || n == 8)  drawVerticalLine(x, y, digitSegmentLength);
-  if(n != 1 && n != 2 && n != 3 && n != 7)  drawVerticalLine(x, y + digitSegmentLength, digitSegmentLength);
-  if(n != 0 && n != 1 && n != 7)            drawHorizontalLine(x, y + digitSegmentLength, digitSegmentLength);
+  if(n != 1 && n != 4)                      drawHorizontalLine(x, y + symbolSegmentLength*2, symbolSegmentLength);
+  if(n != 5 && n != 6)                      drawVerticalLine(x + symbolSegmentLength, y + symbolSegmentLength, symbolSegmentLength);
+  if(n != 2)                                drawVerticalLine(x + symbolSegmentLength, y, symbolSegmentLength);
+  if(n != 1 && n != 4 && n != 7 && n != 9)  drawHorizontalLine(x, y, symbolSegmentLength);
+  if(n == 0 || n == 2 || n == 6 || n == 8)  drawVerticalLine(x, y, symbolSegmentLength);
+  if(n != 1 && n != 2 && n != 3 && n != 7)  drawVerticalLine(x, y + symbolSegmentLength, symbolSegmentLength);
+  if(n != 0 && n != 1 && n != 7)            drawHorizontalLine(x, y + symbolSegmentLength, symbolSegmentLength);
 }
 
-drawWinner()
+drawWinner(int winner)
 {
-  int a = (digitSegmentLength*8 + scoreBias*4)/2;
+  int messageWidth = (symbolSegmentLength*8 + symbolSpacing*4)/2;
 
   //p
-  drawVerticalLine(zoneWidth/2 - a, zoneHeight/2 - digitSegmentLength, digitSegmentLength);
-  drawVerticalLine(zoneWidth/2 - a, zoneHeight/2, digitSegmentLength);
-  drawHorizontalLine(zoneWidth/2 - a, zoneHeight/2, digitSegmentLength);
-  drawHorizontalLine(zoneWidth/2 - a, zoneHeight/2 + digitSegmentLength, digitSegmentLength);
-  drawVerticalLine(zoneWidth/2 - a + digitSegmentLength, zoneHeight/2, digitSegmentLength);
+  drawVerticalLine(zoneWidth/2 - messageWidth, zoneHeight/2 - symbolSegmentLength, symbolSegmentLength);
+  drawVerticalLine(zoneWidth/2 - messageWidth, zoneHeight/2, symbolSegmentLength);
+  drawHorizontalLine(zoneWidth/2 - messageWidth, zoneHeight/2, symbolSegmentLength);
+  drawHorizontalLine(zoneWidth/2 - messageWidth, zoneHeight/2 + symbolSegmentLength, symbolSegmentLength);
+  drawVerticalLine(zoneWidth/2 - messageWidth + symbolSegmentLength, zoneHeight/2, symbolSegmentLength);
 
-  int winner = 1;
-  //num
-  drawDigit(zoneWidth/2 - a + digitSegmentLength + scoreBias, zoneHeight/2 - digitSegmentLength, winner);
+  //winner
+  drawDigit(zoneWidth/2 - messageWidth + symbolSegmentLength + symbolSpacing, zoneHeight/2 - symbolSegmentLength, winner);
 
   //w
-  drawVerticalLine(zoneWidth/2 - a + digitSegmentLength*4 + scoreBias, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
-  drawVerticalLine(zoneWidth/2 - a + (int)(digitSegmentLength*4.5) + scoreBias, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
-  drawVerticalLine(zoneWidth/2 - a + digitSegmentLength*5 + scoreBias, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
-  drawHorizontalLine(zoneWidth/2 - a + digitSegmentLength*4 + scoreBias, zoneHeight/2 - digitSegmentLength, digitSegmentLength);
+  drawVerticalLine(zoneWidth/2 - messageWidth + symbolSegmentLength*4 + symbolSpacing, zoneHeight/2 - symbolSegmentLength, symbolSegmentLength*2);
+  drawVerticalLine(zoneWidth/2 - messageWidth + (int)(symbolSegmentLength*4.5) + symbolSpacing, zoneHeight/2 - symbolSegmentLength, symbolSegmentLength*2);
+  drawVerticalLine(zoneWidth/2 - messageWidth + symbolSegmentLength*5 + symbolSpacing, zoneHeight/2 - symbolSegmentLength, symbolSegmentLength*2);
+  drawHorizontalLine(zoneWidth/2 - messageWidth + symbolSegmentLength*4 + symbolSpacing, zoneHeight/2 - symbolSegmentLength, symbolSegmentLength);
 
   //i
-  drawVerticalLine(zoneWidth/2 - a + (int)(digitSegmentLength*5.5) + scoreBias*2, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
+  drawVerticalLine(zoneWidth/2 - messageWidth + (int)(symbolSegmentLength*5.5) + symbolSpacing*2, zoneHeight/2 - symbolSegmentLength, symbolSegmentLength*2);
 
   //n
-  drawVerticalLine(zoneWidth/2 - a + digitSegmentLength*6 + scoreBias*3, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
-  drawHorizontalLine(zoneWidth/2 - a + digitSegmentLength*6 + scoreBias*3, zoneHeight/2 + digitSegmentLength, digitSegmentLength);
-  drawVerticalLine(zoneWidth/2 - a + digitSegmentLength*7 + scoreBias*3, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
+  drawVerticalLine(zoneWidth/2 - messageWidth + symbolSegmentLength*6 + symbolSpacing*3, zoneHeight/2 - symbolSegmentLength, symbolSegmentLength*2);
+  drawHorizontalLine(zoneWidth/2 - messageWidth + symbolSegmentLength*6 + symbolSpacing*3, zoneHeight/2 + symbolSegmentLength, symbolSegmentLength);
+  drawVerticalLine(zoneWidth/2 - messageWidth + symbolSegmentLength*7 + symbolSpacing*3, zoneHeight/2 - symbolSegmentLength, symbolSegmentLength*2);
 
   //s
-  drawDigit(zoneWidth/2 - a + digitSegmentLength*7 + scoreBias*4, zoneHeight/2 - digitSegmentLength, 5);
+  drawDigit(zoneWidth/2 - messageWidth + symbolSegmentLength*7 + symbolSpacing*4, zoneHeight/2 - symbolSegmentLength, 5);
 }
 
 batCollision()
