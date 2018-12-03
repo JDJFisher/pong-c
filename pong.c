@@ -26,19 +26,22 @@ typedef volatile unsigned int ioreg;
 
 // Constants used to control Pong
 #define zoneWidth 1000
-#define zoneHeight 500
+#define zoneHeight 700
 #define batWidth 20
-#define batLength 70
-#define batSpacing 40
+#define batLength 100
+#define batSpacing 20
 #define scoresOffset 30
-#define digitSegmentLength 25
-#define scoreBias 10
-#define ballSpeed 6
+#define digitSegmentLength 30
+#define scoreBias 20
+#define initialSpeed 5
+#define speedIncrement 1
 #define ballRadius 5
+#define winningScore 5
 
 // Global variables
-int leftBatOffset = 0, rightBatOffset = 0;
-int ballX = 0, ballY = 0;
+int ballSpeed;
+int leftBatOffset, rightBatOffset;
+int ballX, ballY;
 int ballControlX = 1, ballControlY = 1;
 int leftScore = 0, rightScore = 0;
 
@@ -79,20 +82,22 @@ input()
   *ADC_CR = 0x2;                        // start conversion
   while (*ADC_SR & 0x10 == 0);          // wait for ch4 to complete conversion
   int leftPaddleValue = *ADC_CDR4;      // retrieve value from ADC_CDR4 register
+  // leftBatOffset = leftPaddleValue;
 
   // linearly interpolate the value from the left paddle to the appropriate range based on the zone height
   leftBatOffset = (leftPaddleValue - minPaddleValue)
-                 /(maxPaddleValue - minPaddleValue)
-                 *(zoneHeight - batLength);
+                 *(zoneHeight - batLength)
+                 /(maxPaddleValue - minPaddleValue);
 
   *ADC_CR = 0x2;                        // start conversion
   while (*ADC_SR & 0x20 == 0);          // wait for ch5 to complete conversion
   int rightPaddleValue = *ADC_CDR5;     // retrieve value from ADC_CDR4 register
+  // rightBatOffset = rightPaddleValue;
 
   // linearly interpolate the value from the right paddle to the appropriate range based on the zone height
   rightBatOffset = (rightPaddleValue - minPaddleValue)
-                  /(maxPaddleValue - minPaddleValue)
-                  *(zoneHeight - batLength);
+                  *(zoneHeight - batLength)
+                  /(maxPaddleValue - minPaddleValue);
 }
 
 update()
@@ -104,10 +109,17 @@ update()
 
 render()
 {
-  drawZone();
-  drawBall();
-  drawBats();
-  drawScores();
+  if (leftScore >= winningScore || rightScore >= winningScore)
+  {
+    drawWinner();
+  }
+  else
+  {
+    drawZone();
+    drawScores();
+    drawBats();
+    drawBall();
+  }
 }
 
 drawPoint(int x, int y)
@@ -178,6 +190,7 @@ reset()
 {
   ballX = zoneWidth/2;
   ballY = zoneHeight/2;
+  ballSpeed = initialSpeed;
 }
 
 drawScores()
@@ -199,13 +212,46 @@ drawScores()
 void drawDigit(int x, int y, int n)
 {
   n %= 10;
-  if(n == 0 || n == 2 || n == 3 || n == 5 || n == 6 || n == 7 || n == 8 || n == 9)           drawHorizontalLine(x, y + digitSegmentLength*2, digitSegmentLength);
-  if(n == 0 || n == 1 || n == 2 || n == 3 || n == 4 || n == 7 || n == 8 || n == 9)           drawVerticalLine(x + digitSegmentLength, y + digitSegmentLength, digitSegmentLength);
-  if(n == 0 || n == 1 || n == 3 || n == 4 || n == 5 || n == 6 || n == 7 || n == 8 || n == 9) drawVerticalLine(x + digitSegmentLength, y, digitSegmentLength);
-  if(n == 0 || n == 2 || n == 3 || n == 5 || n == 6 || n == 8)                               drawHorizontalLine(x, y, digitSegmentLength);
-  if(n == 0 || n == 2 || n == 6 || n == 8)                                                   drawVerticalLine(x, y, digitSegmentLength);
-  if(n == 0 || n == 4 || n == 5 || n == 6 || n == 8 || n == 9)                               drawVerticalLine(x, y + digitSegmentLength, digitSegmentLength);
-  if(n == 2 || n == 3 || n == 4 || n == 5 || n == 6 || n == 8 || n == 9)                     drawHorizontalLine(x, y + digitSegmentLength, digitSegmentLength);
+  if(n != 1 && n != 4)                      drawHorizontalLine(x, y + digitSegmentLength*2, digitSegmentLength);
+  if(n != 5 && n != 6)                      drawVerticalLine(x + digitSegmentLength, y + digitSegmentLength, digitSegmentLength);
+  if(n != 2)                                drawVerticalLine(x + digitSegmentLength, y, digitSegmentLength);
+  if(n != 1 && n != 4 && n != 7 && n != 9)  drawHorizontalLine(x, y, digitSegmentLength);
+  if(n == 0 || n == 2 || n == 6 || n == 8)  drawVerticalLine(x, y, digitSegmentLength);
+  if(n != 1 && n != 2 && n != 3 && n != 7)  drawVerticalLine(x, y + digitSegmentLength, digitSegmentLength);
+  if(n != 0 && n != 1 && n != 7)            drawHorizontalLine(x, y + digitSegmentLength, digitSegmentLength);
+}
+
+drawWinner()
+{
+  int a = (digitSegmentLength*8 + scoreBias*4)/2;
+
+  //p
+  drawVerticalLine(zoneWidth/2 - a, zoneHeight/2 - digitSegmentLength, digitSegmentLength);
+  drawVerticalLine(zoneWidth/2 - a, zoneHeight/2, digitSegmentLength);
+  drawHorizontalLine(zoneWidth/2 - a, zoneHeight/2, digitSegmentLength);
+  drawHorizontalLine(zoneWidth/2 - a, zoneHeight/2 + digitSegmentLength, digitSegmentLength);
+  drawVerticalLine(zoneWidth/2 - a + digitSegmentLength, zoneHeight/2, digitSegmentLength);
+
+  int winner = 1;
+  //num
+  drawDigit(zoneWidth/2 - a + digitSegmentLength + scoreBias, zoneHeight/2 - digitSegmentLength, winner);
+
+  //w
+  drawVerticalLine(zoneWidth/2 - a + digitSegmentLength*4 + scoreBias, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
+  drawVerticalLine(zoneWidth/2 - a + (int)(digitSegmentLength*4.5) + scoreBias, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
+  drawVerticalLine(zoneWidth/2 - a + digitSegmentLength*5 + scoreBias, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
+  drawHorizontalLine(zoneWidth/2 - a + digitSegmentLength*4 + scoreBias, zoneHeight/2 - digitSegmentLength, digitSegmentLength);
+
+  //i
+  drawVerticalLine(zoneWidth/2 - a + (int)(digitSegmentLength*5.5) + scoreBias*2, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
+
+  //n
+  drawVerticalLine(zoneWidth/2 - a + digitSegmentLength*6 + scoreBias*3, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
+  drawHorizontalLine(zoneWidth/2 - a + digitSegmentLength*6 + scoreBias*3, zoneHeight/2 + digitSegmentLength, digitSegmentLength);
+  drawVerticalLine(zoneWidth/2 - a + digitSegmentLength*7 + scoreBias*3, zoneHeight/2 - digitSegmentLength, digitSegmentLength*2);
+
+  //s
+  drawDigit(zoneWidth/2 - a + digitSegmentLength*7 + scoreBias*4, zoneHeight/2 - digitSegmentLength, 5);
 }
 
 batCollision()
@@ -213,11 +259,24 @@ batCollision()
   if(ballControlX < 0 && ballX - ballRadius < batWidth + batSpacing && ballY > leftBatOffset && ballY < leftBatOffset + batLength)
   {
     ballControlX = -ballControlX;
+    increaseSpeed();
   }
 
   if(ballControlX > 0 && ballX + ballRadius > zoneWidth - batWidth - batSpacing && ballY > rightBatOffset && ballY < rightBatOffset + batLength)
   {
     ballControlX = -ballControlX;
+    increaseSpeed();
+  }
+}
+
+increaseSpeed()
+{
+  ballSpeed += speedIncrement;
+  int maxSpeed = batWidth + batSpacing - 3;
+
+  if(ballSpeed > maxSpeed)
+  {
+    ballSpeed = maxSpeed;
   }
 }
 
@@ -259,6 +318,6 @@ moveBall()
 
 drawBats()
 {
-  drawRect(batSpacing, leftBatOffset, batWidth, batLength);
   drawRect(zoneWidth - batSpacing - batWidth, rightBatOffset, batWidth, batLength);
+  drawRect(batSpacing, leftBatOffset, batWidth, batLength);
 }
