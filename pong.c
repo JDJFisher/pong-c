@@ -119,16 +119,16 @@ render()
   if (leftScore >= winningScore)
   {
     drawWinner(1); // Show that Player 1 wins
-    ballControlX = 1;
+    ballControlX = 1; // Specify ball direction
 
-    checkForGameReset();
+    checkForGameReset(); // Determine when to reset the game
   }
   else if (rightScore >= winningScore)
   {
     drawWinner(2); // Show that Player 2 wins
-    ballControlX = -1;
+    ballControlX = -1; // Specify ball direction
 
-    checkForGameReset();
+    checkForGameReset(); // Determine when to reset the game
   }
   else // Continue running the game
   {
@@ -212,8 +212,10 @@ resetBall()
   ballSpeed = initialSpeed;
 }
 
+// This method controls when the game should be reset
 checkForGameReset()
 {
+  // Use winningScore to regulate game reset
   if(max(leftScore, rightScore) >= winningScore + 3)
   {
     leftScore = 0; rightScore = 0;
@@ -374,7 +376,8 @@ drawBats()
   drawRect(batSpacing, leftBatOffset, batWidth, batLength);
 }
 
-max(int a, int b)
+// This method returns the larger of two integer values
+int max(int a, int b)
 {
-  return a > b ? a : b;
+  return a > b ? a : b; // Conditional expression
 }
