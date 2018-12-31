@@ -68,7 +68,7 @@ int main()
   *ADC_MR = 0x030b0400; // sample+holdtime = 3, startup = b, prescale = 4
 
   // Reset ball properties and position
-  reset();
+  resetBall();
 
   // The main game loop
   while(1)
@@ -119,19 +119,18 @@ render()
   if (leftScore >= winningScore)
   {
     drawWinner(1); // Show that Player 1 wins
+    ballControlX = 1;
+
+    checkForGameReset();
   }
   else if (rightScore >= winningScore)
   {
     drawWinner(2); // Show that Player 2 wins
+    ballControlX = -1;
+
+    checkForGameReset();
   }
-  else if ((leftScore >= (winningScore + 3)) || (rightScore >= (winningScore + 3)))
-  {
-    // Reset the game some time after displaying who the winner was
-    leftScore = 0, rightScore = 0;
-    ballControlX = 1, ballControlY = 1;
-  }
-  
-  if (leftScore < winningScore && rightScore < winningScore) // Continue running the game
+  else // Continue running the game
   {
     drawZone();
     drawScores();
@@ -206,11 +205,20 @@ drawCircle(int x, int y, int r)
 }
 
 // This method resets fundamental ball properties
-reset()
+resetBall()
 {
   ballX = zoneWidth/2;
   ballY = zoneHeight/2;
   ballSpeed = initialSpeed;
+}
+
+checkForGameReset()
+{
+  if(max(leftScore, rightScore) >= winningScore + 3)
+  {
+    leftScore = 0; rightScore = 0;
+    resetBall();
+  }
 }
 
 // This method renders the game scores
@@ -323,14 +331,14 @@ zoneCollision()
   {
     ballControlX = -ballControlX;
     leftScore++;
-    reset();
+    resetBall();
   }
   // Check if the ball exits the game zone by moving left
   else if(ballX - ballRadius < 0)
   {
     ballControlX = -ballControlX;
     rightScore++;
-    reset();
+    resetBall();
   }
 
   // Check if the ball exits the game zone by moving either up or down
@@ -364,4 +372,9 @@ drawBats()
 {
   drawRect(zoneWidth - batSpacing - batWidth, rightBatOffset, batWidth, batLength);
   drawRect(batSpacing, leftBatOffset, batWidth, batLength);
+}
+
+max(int a, int b)
+{
+  return a > b ? a : b;
 }
