@@ -227,7 +227,7 @@ drawScores()
  * (x, y) must correspond to the bottom-left of the
  * digit, whereas n is equivalent to the digit value.
  */
-void drawDigit(int x, int y, int n)
+drawDigit(int x, int y, int n)
 {
   // Perform the requisite comparisons to determine what to draw
   n %= 10;
