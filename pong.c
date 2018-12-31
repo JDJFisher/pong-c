@@ -124,7 +124,14 @@ render()
   {
     drawWinner(2); // Show that Player 2 wins
   }
-  else // Continue running the game
+  else if ((leftScore >= (winningScore + 3)) || (rightScore >= (winningScore + 3)))
+  {
+    // Reset the game some time after displaying who the winner was
+    leftScore = 0, rightScore = 0;
+    ballControlX = 1, ballControlY = 1;
+  }
+  
+  if (leftScore < winningScore && rightScore < winningScore) // Continue running the game
   {
     drawZone();
     drawScores();
