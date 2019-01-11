@@ -1,8 +1,8 @@
 typedef volatile unsigned int ioreg;
 
 // Registers for Driving the Display
-#define PIO_PDR (ioreg *) 0xfffff404 // PIO disable register
-#define PIO_ASR (ioreg *) 0xfffff470 // PIO A select register
+#define PIO_PDR  (ioreg *) 0xfffff404 // PIO disable register
+#define PIO_ASR  (ioreg *) 0xfffff470 // PIO A select register
 
 #define SPI_CR   (ioreg *) 0xfffe0000 // SPI Control Register
 #define SPI_MR   (ioreg *) 0xfffe0004 // SPI Mode Register
@@ -52,15 +52,15 @@ int leftScore = 0, rightScore = 0; // Respective scores of players 1 and 2
 int main()
 {
   // Setting up the registers responsible for handling output
-  *PMC_PCER = 0x34;  // enable PIOA, ADC and SPI
-  LowLevelInit();    // Set up PLL and MCK clocks
-  *PIO_PDR = 0x7800; // disable bits 11 - 14 for SPI (See manual section 10.4)
-  *PIO_ASR = 0x7800; // enable peripheral A for bits 11 - 14
-  *SPI_CR = 0x80;    // reset the SPI
-  *SPI_CR = 0x1;     // enable the SPI
-  *SPI_MR = 0x11;    // set SPI to master, disable fault detection
-  *SPI_CSR0 = 0x183; // set clock polarity = 1, clock phase = 1, Bits per transfer = 16, serial clock baud rate = 1
-  *SPI_TDR = 0xd002; // Set reference voltage to 2.048V in control register
+  *PMC_PCER = 0x34;     // enable PIOA, ADC and SPI
+  LowLevelInit();       // Set up PLL and MCK clocks
+  *PIO_PDR = 0x7800;    // disable bits 11 - 14 for SPI (See manual section 10.4)
+  *PIO_ASR = 0x7800;    // enable peripheral A for bits 11 - 14
+  *SPI_CR = 0x80;       // reset the SPI
+  *SPI_CR = 0x1;        // enable the SPI
+  *SPI_MR = 0x11;       // set SPI to master, disable fault detection
+  *SPI_CSR0 = 0x183;    // set clock polarity = 1, clock phase = 1, Bits per transfer = 16, serial clock baud rate = 1
+  *SPI_TDR = 0xd002;    // Set reference voltage to 2.048V in control register
 
   // Setting up the registers responsible for handling input
   *ADC_CR = 0x1;        // reset the ADC
@@ -84,22 +84,22 @@ int main()
 // This method receives input from the paddles
 input()
 {
-  *ADC_CR = 0x2;                        // start conversion
-  while (*ADC_SR & 0x10 == 0);          // wait for ch4 to complete conversion
-  int leftPaddleValue = *ADC_CDR4;      // retrieve value from ADC_CDR4 register
+  *ADC_CR = 0x2;                      // start conversion
+  while (*ADC_SR & 0x10 == 0);        // wait for ch4 to complete conversion
+  int leftPaddleValue = *ADC_CDR4;    // retrieve value from ADC_CDR4 register
 
-  // Linearly interpolate the value from the left paddle
-  // to the appropriate range based on the zone height
+  // Perform a range scaling operation to map the primitive value from the left 
+  // paddle to an appropriate value in the range outlined by the zone height
   leftBatOffset = (leftPaddleValue - minPaddleValue)
                  *(zoneHeight - batLength)
                  /(maxPaddleValue - minPaddleValue);
 
-  *ADC_CR = 0x2;                        // start conversion
-  while (*ADC_SR & 0x20 == 0);          // wait for ch5 to complete conversion
-  int rightPaddleValue = *ADC_CDR5;     // retrieve value from ADC_CDR5 register
+  *ADC_CR = 0x2;                      // start conversion
+  while (*ADC_SR & 0x20 == 0);        // wait for ch5 to complete conversion
+  int rightPaddleValue = *ADC_CDR5;   // retrieve value from ADC_CDR5 register
 
-  // Linearly interpolate the value from the right paddle
-  // to the appropriate range based on the zone height
+  // Perform a range scaling operation to map the primitive value from the right
+  // paddle to an appropriate value in the range outlined by the zone height
   rightBatOffset = (rightPaddleValue - minPaddleValue)
                   *(zoneHeight - batLength)
                   /(maxPaddleValue - minPaddleValue);
@@ -118,17 +118,17 @@ render()
 {
   if (leftScore >= winningScore)
   {
-    drawWinner(1); // Show that Player 1 wins
-    ballControlX = 1; // Specify ball direction
+    drawWinner(1);       // Show that Player 1 wins
+    ballControlX = 1;    // Specify ball direction
 
-    checkForGameReset(); // Determine when to reset the game
+    checkForGameReset(); // Check whether the game needs to be reset
   }
   else if (rightScore >= winningScore)
   {
-    drawWinner(2); // Show that Player 2 wins
-    ballControlX = -1; // Specify ball direction
+    drawWinner(2);       // Show that Player 2 wins
+    ballControlX = -1;   // Specify ball direction
 
-    checkForGameReset(); // Determine when to reset the game
+    checkForGameReset(); // Check whether the game needs to be reset
   }
   else // Continue running the game
   {
