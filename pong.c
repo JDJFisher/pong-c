@@ -36,10 +36,11 @@ typedef volatile unsigned int ioreg;
 #define scoresOffset 30
 #define symbolSegmentLength 30
 #define symbolSpacing 20
-#define initialSpeed 5
-#define speedIncrement 1
 #define ballRadius 5
 #define winningScore 5
+#define speedIncrement 1
+#define initialSpeed 5
+#define maxSpeed (batWidth + batSpacing - 3)
 
 // Initialisation and Declaration of Global variables
 int ballSpeed; // Speed of the ball
@@ -313,7 +314,6 @@ batCollision()
 increaseSpeed()
 {
   ballSpeed += speedIncrement;
-  int maxSpeed = batWidth + batSpacing - 3;
 
   // Limit the maximum speed
   if(ballSpeed > maxSpeed)
