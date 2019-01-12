@@ -88,7 +88,7 @@ input()
   while (*ADC_SR & 0x10 == 0);        // wait for ch4 to complete conversion
   int leftPaddleValue = *ADC_CDR4;    // retrieve value from ADC_CDR4 register
 
-  // Perform a range scaling operation to map the primitive value from the left 
+  // Perform a range scaling operation to map the primitive value from the left
   // paddle to an appropriate value in the range outlined by the zone height
   leftBatOffset = (leftPaddleValue - minPaddleValue)
                  *(zoneHeight - batLength)
@@ -295,15 +295,13 @@ drawWinner(int winner)
 // to collisions between the ball and bats
 batCollision()
 {
-  // If the ball strikes the left bat, rebound the ball to the right
-  if(ballControlX < 0 && ballX - ballRadius < batWidth + batSpacing && ballY > leftBatOffset && ballY < leftBatOffset + batLength)
-  {
-    ballControlX = -ballControlX;
-    increaseSpeed();
-  }
-
-  // If the ball strikes the right bat, rebound the ball to the left
-  if(ballControlX > 0 && ballX + ballRadius > zoneWidth - batWidth - batSpacing && ballY > rightBatOffset && ballY < rightBatOffset + batLength)
+  // If the ball strikes a bat, rebound it in the opposite direction and increase the ball's speed
+  if(
+    // Check the left bat
+    (ballControlX < 0 && ballX - ballRadius < batWidth + batSpacing && ballY > leftBatOffset && ballY < leftBatOffset + batLength) ||
+    // Check the right bat
+    (ballControlX > 0 && ballX + ballRadius > zoneWidth - batWidth - batSpacing && ballY > rightBatOffset && ballY < rightBatOffset + batLength)
+  )
   {
     ballControlX = -ballControlX;
     increaseSpeed();
