@@ -44,10 +44,11 @@ typedef volatile unsigned int ioreg;
 
 // Initialisation and Declaration of Global variables
 int ballSpeed; // Speed of the ball
+int winner;
 int leftBatOffset, rightBatOffset; // Vertical bat offsets from the zone bottom
 int ballX, ballY; // The coordinates of the ball
 int ballControlX = 1, ballControlY = 1; // Control variables for changing ball direction
-int leftScore = 0, rightScore = 0; // Respective scores of players 1 and 2
+int leftScore, rightScore; // Respective scores of players 1 and 2
 
 // The code driving the program will be executed here
 int main()
@@ -68,8 +69,8 @@ int main()
   *ADC_CHER = 0x30;     // enable analog channels 4 and 5
   *ADC_MR = 0x030b0400; // sample+holdtime = 3, startup = b, prescale = 4
 
-  // Reset ball properties and position
-  resetBall();
+  // Reset the game
+  resetGame();
 
   // The main game loop
   while(1)
@@ -111,27 +112,41 @@ update()
 {
   moveBall();
   zoneCollision();
-  batCollision();
+
+  if(leftScore >= winningScore)
+  {
+    winner = 1;
+    ballControlX = 1;    // Specify ball direction
+
+    if(leftScore >= winningScore + 3)
+    {
+      resetGame();
+    }
+  }
+  else if (rightScore >= winningScore)
+  {
+    winner = 2;
+    ballControlX = -1;   // Specify ball direction
+
+    if(rightScore >= winningScore + 3)
+    {
+      resetGame();
+    }
+  }
+  else
+  {
+    batCollision();
+  }
 }
 
 // This method renders the screen according to any changes in the game
 render()
 {
-  if (leftScore >= winningScore)
+  if(winner != 0)
   {
-    drawWinner(1);       // Show that Player 1 wins
-    ballControlX = 1;    // Specify ball direction
-
-    checkForGameReset(); // Check whether the game needs to be reset
+    drawWinner(winner);
   }
-  else if (rightScore >= winningScore)
-  {
-    drawWinner(2);       // Show that Player 2 wins
-    ballControlX = -1;   // Specify ball direction
-
-    checkForGameReset(); // Check whether the game needs to be reset
-  }
-  else // Continue running the game
+  else
   {
     drawZone();
     drawScores();
@@ -213,15 +228,12 @@ resetBall()
   ballSpeed = initialSpeed;
 }
 
-// This method controls when the game should be reset
-checkForGameReset()
+//
+resetGame()
 {
-  // Use winningScore to regulate game reset
-  if(max(leftScore, rightScore) >= winningScore + 3)
-  {
-    leftScore = 0; rightScore = 0;
-    resetBall();
-  }
+  leftScore = 0; rightScore = 0;
+  winner = 0;
+  resetBall();
 }
 
 // This method renders the game scores
@@ -372,10 +384,4 @@ drawBats()
 {
   drawRect(zoneWidth - batSpacing - batWidth, rightBatOffset, batWidth, batLength);
   drawRect(batSpacing, leftBatOffset, batWidth, batLength);
-}
-
-// This method returns the larger of two integer values
-int max(int a, int b)
-{
-  return a > b ? a : b; // Conditional expression
 }
