@@ -144,7 +144,7 @@ render()
 {
   if(winner != 0)
   {
-    drawWinner(winner);
+    drawWinner();
   }
   else
   {
@@ -271,7 +271,7 @@ drawDigit(int x, int y, int n)
 }
 
 // Method responsible for communicating which player won
-drawWinner(int winner)
+drawWinner()
 {
   // Determine the width of the endgame message
   int messageWidth = (symbolSegmentLength*8 + symbolSpacing*4)/2;
