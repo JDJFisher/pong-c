@@ -38,6 +38,7 @@ typedef volatile unsigned int ioreg;
 #define symbolSpacing 20
 #define ballRadius 5
 #define winningScore 5
+#define scoreBeforeReset (winningScore + 3)
 #define speedIncrement 1
 #define initialSpeed 5
 #define maxSpeed (batWidth + batSpacing - 3)
@@ -118,7 +119,7 @@ update()
     winner = 1;
     ballControlX = 1;    // Specify ball direction
 
-    if(leftScore >= winningScore + 3)
+    if(leftScore >= scoreBeforeReset)
     {
       resetGame();
     }
@@ -128,7 +129,7 @@ update()
     winner = 2;
     ballControlX = -1;   // Specify ball direction
 
-    if(rightScore >= winningScore + 3)
+    if(rightScore >= scoreBeforeReset)
     {
       resetGame();
     }
