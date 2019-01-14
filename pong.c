@@ -143,16 +143,16 @@ update()
 // This method renders the screen according to any changes in the game
 render()
 {
-  if(winner != 0)
-  {
-    drawWinner();
-  }
-  else
+  if(winner == 0)
   {
     drawZone();
     drawScores();
     drawBats();
     drawBall();
+  }
+  else
+  {
+    drawWinner();
   }
 }
 
