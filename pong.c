@@ -54,6 +54,25 @@ int leftScore, rightScore; // Respective scores of players 1 and 2
 // The code driving the program will be executed here
 int main()
 {
+  // Configure the registers
+  configRegisters();
+
+  // Reset the game
+  resetGame();
+
+  // The main game loop
+  while(1)
+  {
+    input();
+    update();
+    render();
+  }
+
+  return 0; // Return 0 if program terminates successfully
+}
+
+configRegisters()
+{
   // Setting up the registers responsible for handling output
   *PMC_PCER = 0x34;     // enable PIOA, ADC and SPI
   LowLevelInit();       // Set up PLL and MCK clocks
@@ -69,19 +88,6 @@ int main()
   *ADC_CR = 0x1;        // reset the ADC
   *ADC_CHER = 0x30;     // enable analog channels 4 and 5
   *ADC_MR = 0x030b0400; // sample+holdtime = 3, startup = b, prescale = 4
-
-  // Reset the game
-  resetGame();
-
-  // The main game loop
-  while(1)
-  {
-    input();
-    update();
-    render();
-  }
-
-  return 0; // Return 0 if program terminates successfully
 }
 
 // This method receives input from the paddles
