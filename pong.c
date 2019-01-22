@@ -19,11 +19,12 @@ typedef volatile unsigned int ioreg;
 #define ADC_CDR4 (ioreg *) 0xfffd8040 // ADC channel 4 data register
 #define ADC_CDR5 (ioreg *) 0xfffd8044 // ADC channel 5 data register
 
-// Registers for setting the X and Y-coordinates on the screen
+// Constants defining the relevant control bits (D12-D15) that are appended to
+// both the X and Y-coordinates to facilitate an appropriate transmission the DAC
 #define portA 0xc000
 #define portB 0x4000
 
-// The minimum and maximum values retrieved from the data register for each channel
+// The minimum and maximum values that can be expressed by the analog paddles
 #define minPaddleValue 105
 #define maxPaddleValue 555
 
@@ -44,14 +45,14 @@ typedef volatile unsigned int ioreg;
 #define maxSpeed (batWidth + batSpacing - 3)
 
 // Initialisation and Declaration of Global variables
-int ballSpeed; // Speed of the ball
-int winner;
-int leftBatOffset, rightBatOffset; // Vertical bat offsets from the zone bottom
-int ballX, ballY; // The coordinates of the ball
-int ballControlX = 1, ballControlY = 1; // Control variables for changing ball direction
-int leftScore, rightScore; // Respective scores of players 1 and 2
+int ballSpeed;                          // Speed of the ball
+int winner;                             // Flag indicating the winner of the match
+int leftBatOffset, rightBatOffset;      // Vertical displacement of the bat from the bottom of the zone
+int ballX, ballY;                       // The coordinates of the ball
+int ballControlX = 1, ballControlY = 1; // Velocity control variables for determining the balls direction
+int leftScore, rightScore;              // Respective scores of players 1 and 2
 
-// The code driving the program will be executed here
+// Entry point of the program
 int main()
 {
   // Configure the registers
@@ -68,7 +69,7 @@ int main()
     render();
   }
 
-  return 0; // Return 0 if program terminates successfully
+  return 0;
 }
 
 configRegisters()
@@ -90,11 +91,11 @@ configRegisters()
   *ADC_MR = 0x030b0400; // sample+holdtime = 3, startup = b, prescale = 4
 }
 
-// This method receives input from the paddles
+// This function extracts the current values of the paddles input devices
 input()
 {
   *ADC_CR = 0x2;                      // start conversion
-  while (*ADC_SR & 0x10 == 0);        // wait for ch4 to complete conversion
+  while (*ADC_SR & 0x10 != 1);        // wait for ch4 to complete conversion
   int leftPaddleValue = *ADC_CDR4;    // retrieve value from ADC_CDR4 register
 
   // Perform a range scaling operation to map the primitive value from the left
@@ -104,7 +105,7 @@ input()
                  /(maxPaddleValue - minPaddleValue);
 
   *ADC_CR = 0x2;                      // start conversion
-  while (*ADC_SR & 0x20 == 0);        // wait for ch5 to complete conversion
+  while (*ADC_SR & 0x20 != 1);        // wait for ch5 to complete conversion
   int rightPaddleValue = *ADC_CDR5;   // retrieve value from ADC_CDR5 register
 
   // Perform a range scaling operation to map the primitive value from the right
@@ -114,7 +115,7 @@ input()
                   /(maxPaddleValue - minPaddleValue);
 }
 
-// This method performs any calculations prior to updating the screen
+// This function handles any calculations required prior to rendering to the screen
 update()
 {
   moveBall();
@@ -122,8 +123,8 @@ update()
 
   if(leftScore >= winningScore)
   {
-    winner = 1;
-    ballControlX = 1;    // Specify ball direction
+    winner = 1;          // Indicate that player 1 has won the match
+    ballControlX = 1;    // Specify ball Velocity to favour the winner
 
     if(leftScore >= scoreBeforeReset)
     {
@@ -132,8 +133,8 @@ update()
   }
   else if (rightScore >= winningScore)
   {
-    winner = 2;
-    ballControlX = -1;   // Specify ball direction
+    winner = 2;          // Indicate that player 2 has won the match
+    ballControlX = -1;   // Specify ball Velocity to favour the winner
 
     if(rightScore >= scoreBeforeReset)
     {
@@ -146,27 +147,27 @@ update()
   }
 }
 
-// This method renders the screen according to any changes in the game
+// This function renders the state of the game to the oscilloscopes display
 render()
 {
-  if(winner == 0)
+  if(winner == 0)   // Render the match state
   {
     drawZone();
     drawScores();
     drawBats();
     drawBall();
   }
-  else
+  else              // Render the gameover state
   {
     drawWinner();
   }
 }
 
-// This method draws a point on the screen at position (x, y)
+// This functio draws a singular point on the display at position (x, y)
 drawPoint(int x, int y)
 {
-  // Check that x and y have values that can be represented by a 10-bit unsigned integer
-  if(x >= 0 && x < 2048 && y >= 0 && y < 2048) // Comparison involves denary values
+  // Check that x and y both have values that can be represented by a 10-bit unsigned integer
+  if(x >= 0 && x < 2048 && y >= 0 && y < 2048)
   {
     /* For both x and y, perform a left bit-shift operation twice (multiply by 4) to
      * move the coordinate value to the appropriate placeholder bits (D02-D11). This
@@ -182,7 +183,7 @@ drawPoint(int x, int y)
   }
 }
 
-// This method draws a line of length l vertically upwards from (x, y)
+// This function draws a line of length l vertically upwards from (x, y)
 drawVerticalLine(int x, int y, int l)
 {
   int i;
@@ -192,7 +193,7 @@ drawVerticalLine(int x, int y, int l)
   }
 }
 
-// This method draws a horizontal line of length l to the right from (x, y)
+// This function draws a horizontal line of length l to the right from (x, y)
 drawHorizontalLine(int x, int y, int l)
 {
   int i;
@@ -202,7 +203,7 @@ drawHorizontalLine(int x, int y, int l)
   }
 }
 
-// This method draws a rectangle whose bottom-left corner is (x, y)
+// This function draws a rectangle whose bottom-left corner is (x, y)
 drawRect(int x, int y, int length, int height)
 {
   drawVerticalLine(x, y, height);
@@ -211,7 +212,7 @@ drawRect(int x, int y, int length, int height)
   drawHorizontalLine(x, y + height, length);
 }
 
-// This method draws a circle of radius r centred at (x, y)
+// This function draws a circle of radius r centred at (x, y)
 drawCircle(int x, int y, int r)
 {
   int i, j;
@@ -227,7 +228,7 @@ drawCircle(int x, int y, int r)
   }
 }
 
-// This method resets fundamental ball properties
+// This function resets the fundamental ball properties
 resetBall()
 {
   ballX = zoneWidth/2;
@@ -235,7 +236,7 @@ resetBall()
   ballSpeed = initialSpeed;
 }
 
-//
+// This function resets the state of the game to being a new match
 resetGame()
 {
   leftScore = 0; rightScore = 0;
@@ -243,10 +244,10 @@ resetGame()
   resetBall();
 }
 
-// This method renders the game scores
+// This function renders both of the players scores to the top of the display
 drawScores()
 {
-  // Draws the colon which keeps the scores separate
+  // Draws the colon which separates the scores
   drawCircle(zoneWidth/2, zoneHeight - scoresOffset - symbolSpacing, 2);
   drawCircle(zoneWidth/2, zoneHeight - scoresOffset - symbolSegmentLength*2 + symbolSpacing, 2);
 
@@ -260,14 +261,16 @@ drawScores()
 }
 
 /*
- * This method draws a digit using a 7-segment display.
- * (x, y) must correspond to the bottom-left of the
+ * This function draws a digit using a 7-segment display.
+ * (x, y) corresponds to the bottom-left of the
  * digit, whereas n is equivalent to the digit value.
  */
 drawDigit(int x, int y, int n)
 {
-  // Perform the requisite comparisons to determine what to draw
+  // Ensure that n is within the valid range by assusinmg its unit value
   n %= 10;
+  // For each of the 7 segments, determine whether the value of n requires the
+  // the segment to produce the digit. If so draw the segment appropriatly.
   if(n != 1 && n != 4)                      drawHorizontalLine(x, y + symbolSegmentLength*2, symbolSegmentLength);
   if(n != 5 && n != 6)                      drawVerticalLine(x + symbolSegmentLength, y + symbolSegmentLength, symbolSegmentLength);
   if(n != 2)                                drawVerticalLine(x + symbolSegmentLength, y, symbolSegmentLength);
@@ -277,7 +280,7 @@ drawDigit(int x, int y, int n)
   if(n != 0 && n != 1 && n != 7)            drawHorizontalLine(x, y + symbolSegmentLength, symbolSegmentLength);
 }
 
-// Method responsible for communicating which player won
+// This function is responsible for rendering the gameover state
 drawWinner()
 {
   // Determine the width of the endgame message
@@ -290,7 +293,7 @@ drawWinner()
   drawHorizontalLine(zoneWidth/2 - messageWidth, zoneHeight/2 + symbolSegmentLength, symbolSegmentLength);
   drawVerticalLine(zoneWidth/2 - messageWidth + symbolSegmentLength, zoneHeight/2, symbolSegmentLength);
 
-  // Display a digit corresponding to the winning player
+  // Display a digit corresponding to the winning player (1 or 2)
   drawDigit(zoneWidth/2 - messageWidth + symbolSegmentLength + symbolSpacing, zoneHeight/2 - symbolSegmentLength, winner);
 
   // Draw the letter W
@@ -311,7 +314,7 @@ drawWinner()
   drawDigit(zoneWidth/2 - messageWidth + symbolSegmentLength*7 + symbolSpacing*4, zoneHeight/2 - symbolSegmentLength, 5);
 }
 
-// Method responsible for detecting and responding
+// This function is responsible for detecting and responding
 // to collisions between the ball and bats
 batCollision()
 {
@@ -328,24 +331,24 @@ batCollision()
   }
 }
 
-// Method responsible for increasing the ball speed
-// following its collision with a bat
+// This function is responsible for increasing the
+// ball's speed following a collision with a bat
 increaseSpeed()
 {
   ballSpeed += speedIncrement;
 
-  // Limit the maximum speed
+  // Limit the maximum speed of the ball
   if(ballSpeed > maxSpeed)
   {
     ballSpeed = maxSpeed;
   }
 }
 
-// Method responsible for detecting and responding
-// to collisions between the ball and walls
+// This function is responsible for detecting and responding
+// to collisions between the ball and boundaries of the game zone
 zoneCollision()
 {
-  // Check if the ball exits the game zone by moving right
+  // Check if the ball exits the mage zone by moving right
   if(ballX + ballRadius > zoneWidth)
   {
     ballControlX = -ballControlX;
@@ -367,26 +370,26 @@ zoneCollision()
   }
 }
 
-// Method responsible for rendering the borders of the game
-drawZone()
-{
-  drawRect(0, 0, zoneWidth, zoneHeight);
-}
-
-// Method responsible for rendering the ball
-drawBall()
-{
-  drawCircle(ballX, ballY, ballRadius);
-}
-
-// Method responsible for updating the ball's position
+// This function is responsible for updating the ball's position
 moveBall()
 {
   ballX += ballControlX * ballSpeed;
   ballY += ballControlY * ballSpeed;
 }
 
-// Method responsible for rendering the bats
+// This function is responsible for rendering the borders of the game
+drawZone()
+{
+  drawRect(0, 0, zoneWidth, zoneHeight);
+}
+
+// This function is responsible for rendering the ball
+drawBall()
+{
+  drawCircle(ballX, ballY, ballRadius);
+}
+
+// This function is responsible for rendering the bats
 drawBats()
 {
   drawRect(zoneWidth - batSpacing - batWidth, rightBatOffset, batWidth, batLength);
