@@ -163,7 +163,7 @@ render()
   }
 }
 
-// This functio draws a singular point on the display at position (x, y)
+// This function draws a singular point on the display at position (x, y)
 drawPoint(int x, int y)
 {
   // Check that x and y both have values that can be represented by a 10-bit unsigned integer
