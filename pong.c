@@ -348,7 +348,7 @@ increaseSpeed()
 // to collisions between the ball and boundaries of the game zone
 zoneCollision()
 {
-  // Check if the ball exits the mage zone by moving right
+  // Check if the ball exits the game zone by moving right
   if(ballX + ballRadius > zoneWidth)
   {
     ballControlX = -ballControlX;
